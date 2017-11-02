@@ -9,8 +9,8 @@ source $BASEDIR/env/bin/activate
 
 pip install -r $BASEDIR/requirements.txt
 
+git clone https://github.com/Wizmann/python-ikcp.git
 cd $BASEDIR/python-ikcp/
-git submodule update --init --recursive
 
 python setup.py build
 python setup.py install
