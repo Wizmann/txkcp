@@ -51,6 +51,8 @@ class Protocol(protocol.DatagramProtocol):
             delta = max(0, next - self.tick)
             reactor.callLater(to_millisec(delta), self.update)
         except Exception, e:
+            import traceback
+            traceback.print_exc()
             logging.error("error on kcp tick: %s" % e)
             reactor.callLater(to_millisec(30), self.update)
 
@@ -58,6 +60,7 @@ class Protocol(protocol.DatagramProtocol):
         self.kcp.send(data)
 
     def datagramReceived(self, data, addr):
+        logging.debug("datagram received from %s:%s" % addr)
         self.kcp.input(data)
 
     def dataReceived(self, data):
@@ -77,10 +80,17 @@ class ProtocolFactory(protocol.DatagramProtocol):
         logging.debug("datagram received from %s:%s" % addr)
         conv = ikcp.IKcp.get_conv(data)
         conn_id = (addr, conv)
+        logging.debug("connection id: %s(%s)" % conn_id)
         if conn_id not in self.d:
             self.d[conn_id] = self.protocol(addr, conv, self)
+            d = defer.Deferred()
+            d.addCallback(lambda _:
+                self.d[conn_id].datagramReceived(data, addr)
+            )
+            self.d[conn_id].startProtocol(d)
 
-        self.d[conn_id].datagramReceived(data, addr)
+        else:
+            self.d[conn_id].datagramReceived(data, addr)
 
     def connectionLost(self, protocol):
         logging.debug("protocol connection lost: %s" % protocol.addr)
