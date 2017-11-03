@@ -20,18 +20,20 @@ class SocketAdapter(object):
         self.peer.transport.write(data, self.addr)
 
 class Protocol(protocol.DatagramProtocol):
-    def __init__(self, addr, conv, factory=None, mode=ikcp.DEFAULT_MODE):
+    def __init__(self, addr, conv, factory=None, wndsize=1024, mode=ikcp.DEFAULT_MODE):
         if factory:
             self.socket = SocketAdapter(factory, addr)
         else:
             self.socket = SocketAdapter(self, addr)
 
+        self.addr = addr
         self.conv = conv
         self.kcp_mode = mode
         self.factory = factory
         self.tick = 0
         self.pre_timestamp = timestamp()
         self.kcp = ikcp.IKcp(self.socket, conv, mode)
+        self.kcp.wndsize(wndsize, wndsize)
 
         self.update()
 
@@ -44,7 +46,8 @@ class Protocol(protocol.DatagramProtocol):
 
             if next <= self.tick or self.kcp.next_update_time == 0:
                 self.kcp.update(self.tick)
-                data = self.kcp.recv(1024)
+                bufsize = max(1500, self.kcp.peeksize)
+                data = self.kcp.recv(bufsize)
                 if data:
                     self.dataReceived(data)
 
@@ -72,6 +75,8 @@ class Protocol(protocol.DatagramProtocol):
 
 class ProtocolFactory(protocol.DatagramProtocol):
     protocol = None
+    wndsize = 1024
+    mode=ikcp.DEFAULT_MODE
 
     def __init__(self):
         self.d = {}
@@ -82,7 +87,7 @@ class ProtocolFactory(protocol.DatagramProtocol):
         conn_id = (addr, conv)
         logging.debug("connection id: %s(%s)" % conn_id)
         if conn_id not in self.d:
-            self.d[conn_id] = self.protocol(addr, conv, self)
+            self.d[conn_id] = self.protocol(addr, conv, self, self.wndsize, self.mode)
             d = defer.Deferred()
             d.addCallback(lambda _:
                 self.d[conn_id].datagramReceived(data, addr)
@@ -93,5 +98,6 @@ class ProtocolFactory(protocol.DatagramProtocol):
             self.d[conn_id].datagramReceived(data, addr)
 
     def connectionLost(self, protocol):
-        logging.debug("protocol connection lost: %s" % protocol.addr)
-        del self.d[protocol.addr]
+        conn_id = (protocol.addr, protocol.conv)
+        logging.debug("protocol connection lost: %s" % str(conn_id))
+        del self.d[conn_id]
