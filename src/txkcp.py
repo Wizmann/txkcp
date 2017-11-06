@@ -54,8 +54,6 @@ class Protocol(protocol.DatagramProtocol):
             delta = max(0, next - self.tick)
             reactor.callLater(to_millisec(delta), self.update)
         except Exception, e:
-            import traceback
-            traceback.print_exc()
             logging.error("error on kcp tick: %s" % e)
             reactor.callLater(to_millisec(30), self.update)
 
