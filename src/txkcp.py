@@ -61,7 +61,6 @@ class Protocol(protocol.DatagramProtocol):
         self.kcp.send(data)
 
     def datagramReceived(self, data, addr):
-        logging.debug("datagram received from %s:%s" % addr)
         self.kcp.input(data)
 
     def dataReceived(self, data):
@@ -80,10 +79,8 @@ class ProtocolFactory(protocol.DatagramProtocol):
         self.d = {}
 
     def datagramReceived(self, data, addr):
-        logging.debug("datagram received from %s:%s" % addr)
         conv = ikcp.IKcp.get_conv(data)
         conn_id = (addr, conv)
-        logging.debug("connection id: %s(%s)" % conn_id)
         if conn_id not in self.d:
             self.d[conn_id] = self.protocol(addr, conv, self, self.wndsize, self.mode)
             d = defer.Deferred()
